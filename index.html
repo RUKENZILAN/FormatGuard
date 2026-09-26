@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FormatGuard — JSON ⇄ YAML</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<style>
+  :root{
+    --bg:#0B0F14;
+    --panel:#11161D;
+    --panel-2:#161D27;
+    --border:#1F2A37;
+    --text:#D7DEE7;
+    --muted:#6B7785;
+    --accent:#22D3D8;
+    --accent-dim:#0E7490;
+    --ok:#34D399;
+    --warn:#FBBF24;
+    --danger:#F87171;
+    --mono: 'JetBrains Mono','SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace;
+  }
+  body[data-theme="light"]{
+    --bg:#FFFFFF;
+    --panel:#F7F8FA;
+    --panel-2:#F0F2F5;
+    --border:#DDE2E8;
+    --text:#0B0F14;
+    --muted:#5B6572;
+    --accent:#0E7490;
+    --accent-dim:#22D3D8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(900px 500px at 80% -10%, rgba(34,211,216,0.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--mono);
+    min-height:100vh;
+    padding:28px 20px 60px;
+    transition:background .2s ease, color .2s ease;
+  }
+  body[data-theme="light"]{
+    background: radial-gradient(900px 500px at 80% -10%, rgba(14,116,144,0.05), transparent 60%), var(--bg);
+  }
+  .wrap{max-width:1040px;margin:0 auto;}
+
+  /* header */
+  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .glyph{
+    width:30px;height:30px;flex:none;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--accent-dim);
+    border-radius:7px;
+    color:var(--accent);
+    background:rgba(34,211,216,0.08);
+    font-size:15px;
+  }
+  .brand h1{
+    font-size:16px;letter-spacing:0.06em;margin:0;font-weight:700;
+    text-transform:uppercase;color:var(--text);
+  }
+  .brand p{margin:2px 0 0;color:var(--muted);font-size:12px;letter-spacing:0.01em;}
+  .status-pill{
+    font-size:11px;letter-spacing:0.08em;text-transform:uppercase;
+    padding:6px 12px;border-radius:999px;border:1px solid var(--border);
+    color:var(--muted);background:var(--panel);white-space:nowrap;
+    transition:all .15s ease;
+  }
+  .status-pill.ok{color:var(--ok);border-color:rgba(52,211,153,0.35);background:rgba(52,211,153,0.07);}
+  .status-pill.warn{color:var(--warn);border-color:rgba(251,191,36,0.35);background:rgba(251,191,36,0.07);}
+  .status-pill.danger{color:var(--danger);border-color:rgba(248,113,113,0.4);background:rgba(248,113,113,0.08);}
+
+  .theme-toggle{
+    width:34px;height:34px;border-radius:8px;border:1px solid var(--border);
+    background:var(--panel);color:var(--muted);cursor:pointer;font-size:14px;
+    display:flex;align-items:center;justify-content:center;flex:none;
+    transition:all .15s ease;
+  }
+  .theme-toggle:hover{color:var(--accent);border-color:var(--accent-dim);}
+  .head-right{display:flex;align-items:center;gap:10px;}
+
+  /* toolbar */
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .pillgroup{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .pillgroup button{
+    font-family:var(--mono);font-size:12px;letter-spacing:0.03em;
+    background:var(--panel);color:var(--muted);border:none;
+    padding:9px 14px;cursor:pointer;transition:all .15s ease;
+  }
+  .pillgroup button + button{border-left:1px solid var(--border);}
+  .pillgroup button.active{background:rgba(34,211,216,0.1);color:var(--accent);}
+  .pillgroup button:hover:not(.active){color:var(--text);}
+  .swap-btn{
+    width:34px;height:34px;border-radius:8px;border:1px solid var(--border);
+    background:var(--panel);color:var(--muted);cursor:pointer;font-size:14px;
+    display:flex;align-items:center;justify-content:center;transition:all .15s ease;
+  }
+  .swap-btn:hover{color:var(--accent);border-color:var(--accent-dim);}
+  .spacer{flex:1;}
+  .ghost-btn{
+    font-family:var(--mono);font-size:12px;color:var(--muted);
+    background:transparent;border:1px solid var(--border);border-radius:8px;
+    padding:9px 13px;cursor:pointer;letter-spacing:0.03em;transition:all .15s ease;
+  }
+  .ghost-btn:hover{color:var(--text);border-color:var(--accent-dim);}
+
+  /* panels */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:760px){.grid{grid-template-columns:1fr;}}
+  .panel{
+    background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    overflow:hidden;display:flex;flex-direction:column;min-height:320px;
+  }
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:9px 13px;border-bottom:1px solid var(--border);
+    font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);
+  }
+  .panel-head .tag{color:var(--text);}
+  .charcount{font-size:10px;color:var(--muted);}
+  textarea, pre.output{
+    flex:1;width:100%;border:none;outline:none;resize:none;
+    background:transparent;color:var(--text);font-family:var(--mono);
+    font-size:13px;line-height:1.55;padding:14px;
+  }
+  textarea::placeholder{color:#3B4754;}
+  pre.output{margin:0;white-space:pre-wrap;word-break:break-word;overflow:auto;}
+  pre.output.empty{color:#3B4754;}
+  .panel-foot{
+    display:flex;gap:8px;padding:8px 10px;border-top:1px solid var(--border);
+    justify-content:flex-end;
+  }
+  .panel-foot button{
+    font-family:var(--mono);font-size:11px;color:var(--muted);
+    background:transparent;border:1px solid var(--border);border-radius:6px;
+    padding:6px 10px;cursor:pointer;transition:all .15s ease;
+  }
+  .panel-foot button:hover{color:var(--accent);border-color:var(--accent-dim);}
+
+  /* security log */
+  .scan{
+    margin-top:14px;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:10px;overflow:hidden;
+  }
+  .scan-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:9px 13px;border-bottom:1px solid var(--border);
+    font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);
+  }
+  .scan-body{padding:10px 13px;font-size:12px;line-height:1.9;max-height:220px;overflow:auto;}
+  .scan-line{display:flex;align-items:center;gap:9px;color:var(--muted);}
+  .scan-line .dot{width:7px;height:7px;border-radius:50%;background:#3B4754;flex:none;}
+  .scan-line.ok .dot{background:var(--ok);box-shadow:0 0 6px rgba(52,211,153,.6);}
+  .scan-line.warn .dot{background:var(--warn);box-shadow:0 0 6px rgba(251,191,36,.6);}
+  .scan-line.danger .dot{background:var(--danger);box-shadow:0 0 6px rgba(248,113,113,.6);}
+  .scan-line.ok{color:#A9E8D3;}
+  .scan-line.warn{color:#F6DBA0;}
+  .scan-line.danger{color:#F6B8B8;}
+  .scan-line .label{flex:none;min-width:190px;color:inherit;}
+  .scan-line .detail{color:var(--muted);}
+
+  .legend{margin-top:10px;color:var(--muted);font-size:11px;line-height:1.7;}
+  .legend b{color:var(--text);}
+
+  .toast{
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(8px);
+    background:var(--panel-2);border:1px solid var(--accent-dim);color:var(--accent);
+    padding:8px 16px;border-radius:8px;font-size:12px;opacity:0;
+    transition:all .2s ease;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div class="brand">
+      <div class="glyph">◆</div>
+      <div>
+        <h1>FormatGuard</h1>
+        <p>JSON ⇄ YAML conversion, scanned before it ever hits the page</p>
+      </div>
+    </div>
+    <div class="head-right">
+      <button class="theme-toggle" id="themeToggle" title="Toggle background">☾</button>
+      <div class="status-pill" id="statusPill">idle</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="pillgroup">
+      <button id="dirJ2Y" class="active">JSON → YAML</button>
+      <button id="dirY2J">YAML → JSON</button>
+    </div>
+    <button class="swap-btn" id="swapBtn" title="Swap direction">⇄</button>
+    <div class="spacer"></div>
+    <button class="ghost-btn" id="sampleBtn">load sample</button>
+    <button class="ghost-btn" id="clearBtn">clear</button>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="tag" id="inputLabel">input · json</span>
+        <span class="charcount" id="inCount">0 / 1,000,000 chars</span>
+      </div>
+      <textarea id="inputArea" spellcheck="false" placeholder='{
+  "service": "formatguard",
+  "active": true
+}'></textarea>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="tag" id="outputLabel">output · yaml</span>
+        <span class="charcount" id="outCount">0 chars</span>
+      </div>
+      <pre class="output empty" id="outputArea">— converted output appears here —</pre>
+      <div class="panel-foot">
+        <button id="copyBtn">copy</button>
+        <button id="downloadBtn">download</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="scan">
+    <div class="scan-head">
+      <span>security scan log</span>
+      <span id="scanSummary">waiting for input</span>
+    </div>
+    <div class="scan-body" id="scanBody">
+      <div class="scan-line"><span class="dot"></span><span class="label">— no input yet —</span></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    Runs entirely in your browser — nothing is sent anywhere. Every conversion passes through five checks before
+    it's rendered: <b>size cap</b>, <b>structural depth</b>, <b>node count</b>, <b>prototype-pollution keys</b>
+    (<code>__proto__</code>, <code>constructor</code>, <code>prototype</code>), and an <b>expansion-ratio</b> check
+    that catches YAML "billion laughs" anchor bombs. YAML is parsed with a JSON-only schema, so executable or
+    custom tags (e.g. <code>!!js/function</code>) are rejected outright. Output is written via <code>textContent</code>,
+    never <code>innerHTML</code>, so a malicious payload can't execute as markup.
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const LIMITS = {
+    MAX_CHARS: 1_000_000,
+    MAX_DEPTH: 50,
+    MAX_NODES: 20_000,
+    MAX_EXPANSION_RATIO: 50, // output_len / input_len ceiling
+  };
+  const DANGEROUS_KEYS = new Set(['__proto__','constructor','prototype']);
+
+  const inputArea   = document.getElementById('inputArea');
+  const outputArea  = document.getElementById('outputArea');
+  const inCount     = document.getElementById('inCount');
+  const outCount    = document.getElementById('outCount');
+  const inputLabel  = document.getElementById('inputLabel');
+  const outputLabel = document.getElementById('outputLabel');
+  const scanBody    = document.getElementById('scanBody');
+  const scanSummary = document.getElementById('scanSummary');
+  const statusPill  = document.getElementById('statusPill');
+  const dirJ2Y = document.getElementById('dirJ2Y');
+  const dirY2J = document.getElementById('dirY2J');
+
+  let direction = 'j2y'; // j2y = JSON -> YAML, y2j = YAML -> JSON
+  let debounceTimer = null;
+  let theme = 'dark';
+
+  const themeToggle = document.getElementById('themeToggle');
+  function applyTheme(t){
+    theme = t;
+    document.body.setAttribute('data-theme', t);
+    themeToggle.textContent = t === 'dark' ? '☾' : '☀';
+    themeToggle.title = t === 'dark' ? 'Switch to white background' : 'Switch to black background';
+  }
+  themeToggle.addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
+  applyTheme('dark');
+
+  const SAMPLES = {
+    j2y: `{
+  "service": "formatguard",
+  "version": 1,
+  "active": true,
+  "owners": ["ana", "leo"],
+  "limits": { "maxRetries": 3, "timeoutMs": 4000 }
+}`,
+    y2j: `service: formatguard
+version: 1
+active: true
+owners:
+  - ana
+  - leo
+limits:
+  maxRetries: 3
+  timeoutMs: 4000`
+  };
+
+  function setDirection(dir){
+    direction = dir;
+    dirJ2Y.classList.toggle('active', dir === 'j2y');
+    dirY2J.classList.toggle('active', dir === 'y2j');
+    inputLabel.textContent  = dir === 'j2y' ? 'input · json'  : 'input · yaml';
+    outputLabel.textContent = dir === 'j2y' ? 'output · yaml' : 'output · json';
+    inputArea.placeholder = SAMPLES[dir];
+    runPipeline();
+  }
+
+  dirJ2Y.addEventListener('click', () => setDirection('j2y'));
+  dirY2J.addEventListener('click', () => setDirection('y2j'));
+  document.getElementById('swapBtn').addEventListener('click', () => {
+    const outText = outputArea.textContent;
+    setDirection(direction === 'j2y' ? 'y2j' : 'j2y');
+    if (outText && !outputArea.classList.contains('empty')) {
+      inputArea.value = outText;
+    }
+    runPipeline();
+  });
+  document.getElementById('sampleBtn').addEventListener('click', () => {
+    inputArea.value = SAMPLES[direction];
+    runPipeline();
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    inputArea.value = '';
+    runPipeline();
+  });
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const text = outputArea.textContent;
+    if (!text || outputArea.classList.contains('empty')) return;
+    navigator.clipboard.writeText(text).then(() => showToast('copied to clipboard'));
+  });
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    const text = outputArea.textContent;
+    if (!text || outputArea.classList.contains('empty')) return;
+    const ext = direction === 'j2y' ? 'yaml' : 'json';
+    const blob = new Blob([text], {type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `converted.${ext}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1400);
+  }
+
+  inputArea.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runPipeline, 250);
+    inCount.textContent = `${inputArea.value.length.toLocaleString()} / ${LIMITS.MAX_CHARS.toLocaleString()} chars`;
+  });
+
+  // ---- security checks ----
+
+  function checkSize(raw){
+    const ok = raw.length <= LIMITS.MAX_CHARS;
+    return {
+      key:'size cap', status: ok ? 'ok' : 'danger',
+      detail: `${raw.length.toLocaleString()} / ${LIMITS.MAX_CHARS.toLocaleString()} chars`,
+      blocking: !ok
+    };
+  }
+
+  function checkStructure(value){
+    let maxDepth = 0, nodeCount = 0;
+    const danger = [];
+
+    function walk(v, depth){
+      nodeCount++;
+      if (depth > maxDepth) maxDepth = depth;
+      if (v && typeof v === 'object'){
+        for (const k of Object.keys(v)){
+          if (DANGEROUS_KEYS.has(k)) danger.push(k);
+        }
+        for (const k of Object.keys(v)){
+          walk(v[k], depth + 1);
+        }
+      }
+    }
+    walk(value, 0);
+    return { maxDepth, nodeCount, danger };
+  }
+
+  function stripDangerousKeys(value){
+    if (Array.isArray(value)) return value.map(stripDangerousKeys);
+    if (value && typeof value === 'object'){
+      const clean = {};
+      for (const k of Object.keys(value)){
+        if (DANGEROUS_KEYS.has(k)) continue;
+        clean[k] = stripDangerousKeys(value[k]);
+      }
+      return clean;
+    }
+    return value;
+  }
+
+  function line(label, status, detail){
+    return {label, status, detail};
+  }
+
+  function renderScan(lines, overallStatus){
+    scanBody.innerHTML = '';
+    for (const l of lines){
+      const row = document.createElement('div');
+      row.className = `scan-line ${l.status}`;
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = l.label; // textContent only — never innerHTML
+      const detail = document.createElement('span');
+      detail.className = 'detail';
+      detail.textContent = l.detail || '';
+      row.appendChild(dot);
+      row.appendChild(label);
+      row.appendChild(detail);
+      scanBody.appendChild(row);
+    }
+    statusPill.classList.remove('ok','warn','danger');
+    if (overallStatus === 'ok'){
+      statusPill.textContent = 'secure';
+      statusPill.classList.add('ok');
+      scanSummary.textContent = 'all checks passed';
+    } else if (overallStatus === 'warn'){
+      statusPill.textContent = 'sanitized';
+      statusPill.classList.add('warn');
+      scanSummary.textContent = 'passed with auto-fixes';
+    } else if (overallStatus === 'danger'){
+      statusPill.textContent = 'blocked';
+      statusPill.classList.add('danger');
+      scanSummary.textContent = 'conversion blocked';
+    } else {
+      statusPill.textContent = 'idle';
+      scanSummary.textContent = 'waiting for input';
+    }
+  }
+
+  function setOutput(text, empty){
+    outputArea.textContent = text; // textContent, never innerHTML — output is never parsed as markup
+    outputArea.classList.toggle('empty', !!empty);
+    outCount.textContent = empty ? '0 chars' : `${text.length.toLocaleString()} chars`;
+  }
+
+  function runPipeline(){
+    const raw = inputArea.value;
+
+    if (!raw.trim()){
+      setOutput('— converted output appears here —', true);
+      renderScan([], 'idle');
+      return;
+    }
+
+    const lines = [];
+    const sizeCheck = checkSize(raw);
+    lines.push(line('size cap', sizeCheck.status, sizeCheck.detail));
+
+    if (sizeCheck.blocking){
+      setOutput('Blocked: input exceeds the 1,000,000 character limit.', true);
+      renderScan(lines, 'danger');
+      return;
+    }
+
+    // --- parse ---
+    let parsed;
+    try {
+      if (direction === 'j2y'){
+        parsed = JSON.parse(raw);
+      } else {
+        parsed = jsyaml.load(raw, { schema: jsyaml.JSON_SCHEMA, json: true });
+      }
+      lines.push(line('parse', 'ok', direction === 'j2y' ? 'valid JSON' : 'valid YAML (JSON-only schema)'));
+    } catch (err) {
+      lines.push(line('parse', 'danger', String(err.message || err).slice(0,120)));
+      setOutput(`Parse error — ${err.message || err}`, true);
+      renderScan(lines, 'danger');
+      return;
+    }
+
+    if (parsed === undefined){
+      lines.push(line('empty document', 'warn', 'nothing to convert'));
+      setOutput('', true);
+      renderScan(lines, 'warn');
+      return;
+    }
+
+    // --- structural checks ---
+    const { maxDepth, nodeCount, danger } = checkStructure(parsed);
+
+    const depthOk = maxDepth <= LIMITS.MAX_DEPTH;
+    lines.push(line('structural depth', depthOk ? 'ok' : 'danger', `${maxDepth} / ${LIMITS.MAX_DEPTH} levels`));
+
+    const nodesOk = nodeCount <= LIMITS.MAX_NODES;
+    lines.push(line('node count', nodesOk ? 'ok' : 'danger', `${nodeCount.toLocaleString()} / ${LIMITS.MAX_NODES.toLocaleString()}`));
+
+    if (!depthOk || !nodesOk){
+      setOutput('Blocked: structure exceeds safe depth/size limits (possible YAML bomb).', true);
+      renderScan(lines, 'danger');
+      return;
+    }
+
+    let working = parsed;
+    let pollutionStatus = 'ok';
+    if (danger.length){
+      const unique = [...new Set(danger)];
+      lines.push(line('prototype-pollution keys', 'warn', `stripped: ${unique.join(', ')}`));
+      working = stripDangerousKeys(parsed);
+      pollutionStatus = 'warn';
+    } else {
+      lines.push(line('prototype-pollution keys', 'ok', 'none found'));
+    }
+
+    // --- serialize ---
+    let output;
+    try {
+      output = direction === 'j2y'
+        ? jsyaml.dump(working, { noRefs: true, lineWidth: 100 })
+        : JSON.stringify(working, null, 2);
+    } catch (err) {
+      lines.push(line('serialize', 'danger', String(err.message || err).slice(0,120)));
+      setOutput(`Serialize error — ${err.message || err}`, true);
+      renderScan(lines, 'danger');
+      return;
+    }
+
+    // --- expansion ratio (anchor / alias bomb guard) ---
+    const ratio = output.length / Math.max(raw.length, 1);
+    const ratioOk = ratio <= LIMITS.MAX_EXPANSION_RATIO;
+    lines.push(line('expansion ratio', ratioOk ? 'ok' : 'danger', `${ratio.toFixed(1)}x (cap ${LIMITS.MAX_EXPANSION_RATIO}x)`));
+
+    if (!ratioOk){
+      setOutput('Blocked: output ballooned far beyond input size — likely an anchor/alias expansion bomb.', true);
+      renderScan(lines, 'danger');
+      return;
+    }
+
+    setOutput(output, false);
+    renderScan(lines, pollutionStatus === 'warn' ? 'warn' : 'ok');
+  }
+
+  // initial state
+  setDirection('j2y');
+})();
+</script>
+</body>
+</html>
